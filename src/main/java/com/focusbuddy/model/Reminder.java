@@ -21,6 +21,5 @@ public class Reminder {
     private LocalDateTime remindAt;
     private boolean sent;
     private Long userId; // or link to Todo if needed
-    private boolean repeatDaily;
 
 }
