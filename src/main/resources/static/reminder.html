@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FocusBuddy Reminders</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .reminder {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background-color: #f0f8ff;
+            position: relative;
+        }
+
+        .sent {
+            color: green;
+            font-weight: bold;
+        }
+
+        .actions {
+            margin-top: 10px;
+        }
+
+        button {
+            margin-right: 5px;
+        }
+
+        #form-container {
+            margin-bottom: 30px;
+        }
+
+        .edit-fields {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .edit-fields input {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+<h2>⏰ FocusBuddy Live Reminders</h2>
+
+<!-- Add Reminder Form -->
+<div id="form-container">
+    <h3>➕ Add New Reminder</h3>
+    <form id="reminderForm">
+        <label>Message: <input type="text" id="message" required></label><br><br>
+        <label>Remind At: <input type="datetime-local" id="remindAt" required></label><br><br>
+        <button type="submit">Add Reminder</button>
+    </form>
+    <p id="formStatus"></p>
+</div>
+
+<!-- Reminder List -->
+<h3>📋 All Reminders</h3>
+<div id="reminderList">
+    <p>Loading reminders...</p>
+</div>
+
+<script>
+    const userId = 1;
+
+    function renderReminder(reminder, prepend = false) {
+        const reminderDiv = document.createElement("div");
+        reminderDiv.className = "reminder";
+        reminderDiv.setAttribute("data-id", reminder.id);
+
+        const isoTime = reminder.remindAt.replace(" ", "T");
+
+        reminderDiv.innerHTML = `
+            <strong class="display-msg">${reminder.message}</strong><br>
+            ⏱ <span class="display-time">${isoTime}</span><br>
+            Status: <span class="sent">${reminder.sent ? "✅ Sent" : "🕒 Pending"}</span>
+
+            <div class="edit-fields">
+                <label>Message: <input type="text" class="edit-msg" value="${reminder.message}"></label><br>
+                <label>Remind At: <input type="datetime-local" class="edit-time" value="${isoTime}"></label><br>
+                <button onclick="saveReminder(${reminder.id})">💾 Save</button>
+                <button onclick="cancelEdit(${reminder.id})">❌ Cancel</button>
+            </div>
+
+            <div class="actions">
+                <button onclick="startEditReminder(${reminder.id})">✏️ Edit</button>
+                <button onclick="deleteReminder(${reminder.id})">🗑 Delete</button>
+            </div>
+        `;
+
+        const reminderList = document.getElementById("reminderList");
+        if (prepend) {
+            reminderList.prepend(reminderDiv);
+        } else {
+            reminderList.appendChild(reminderDiv);
+        }
+    }
+
+    // Load existing reminders
+    fetch(`http://localhost:8080/api/reminders/user/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            const reminderList = document.getElementById("reminderList");
+            reminderList.innerHTML = "";
+
+            if (data.length === 0) {
+                reminderList.innerHTML = "<p>No reminders yet.</p>";
+            }
+
+            data.reverse().forEach(reminder => renderReminder(reminder));
+        });
+
+    // SSE live reminder stream
+    const eventSource = new EventSource(`http://localhost:8080/api/reminders/stream/${userId}`);
+    eventSource.addEventListener("reminder", function (event) {
+        const reminder = JSON.parse(event.data);
+        renderReminder(reminder, true);
+
+        if (Notification.permission === "granted") {
+            new Notification("FocusBuddy Reminder", { body: reminder.message });
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification("FocusBuddy Reminder", { body: reminder.message });
+                }
+            });
+        }
+    });
+
+    // Add new reminder
+    document.getElementById("reminderForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const message = document.getElementById("message").value;
+        const remindAt = document.getElementById("remindAt").value;
+
+        const reminderDTO = {
+            message: message,
+            remindAt: remindAt,
+            userId: userId,
+            sent: false
+        };
+
+        fetch("http://localhost:8080/api/reminders/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(reminderDTO)
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("formStatus").innerText = "✅ Reminder added!";
+                document.getElementById("reminderForm").reset();
+                renderReminder(data, true);
+            });
+    });
+
+    // Edit reminder
+    window.startEditReminder = function (id) {
+        const div = document.querySelector(`div[data-id='${id}']`);
+        div.querySelector(".edit-fields").style.display = "block";
+        div.querySelector(".display-msg").style.display = "none";
+        div.querySelector(".display-time").style.display = "none";
+    };
+
+    window.cancelEdit = function (id) {
+        const div = document.querySelector(`div[data-id='${id}']`);
+        div.querySelector(".edit-fields").style.display = "none";
+        div.querySelector(".display-msg").style.display = "inline";
+        div.querySelector(".display-time").style.display = "inline";
+    };
+
+    window.saveReminder = function (id) {
+        const div = document.querySelector(`div[data-id='${id}']`);
+        const newMessage = div.querySelector(".edit-msg").value;
+        const newTime = div.querySelector(".edit-time").value;
+
+        const updated = {
+            id: id,
+            message: newMessage,
+            remindAt: newTime,
+            sent: false,
+            userId: userId
+        };
+
+        fetch(`http://localhost:8080/api/reminders/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updated)
+        })
+            .then(response => response.json())
+            .then(data => {
+                div.remove(); // remove old
+                renderReminder(data, true); // re-add updated
+                console.log("Reminder updated successfully");
+            });
+    };
+
+    // Delete reminder
+    window.deleteReminder = function (id) {
+        if (confirm("Are you sure you want to delete this reminder?")) {
+            fetch(`http://localhost:8080/api/reminders/delete/${id}`, {
+                method: "DELETE"
+            }).then(() => {
+                const div = document.querySelector(`div[data-id='${id}']`);
+                if (div) div.remove();
+                console.log("Reminder deleted successfully");
+            });
+        }
+    };
+
+    // Ask browser permission early
+    if (Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+</script>
+</body>
+</html>
