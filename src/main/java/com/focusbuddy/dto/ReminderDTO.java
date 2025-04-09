@@ -10,6 +10,5 @@ public class ReminderDTO {
     private LocalDateTime remindAt;
     private boolean sent;
     private Long userId;
-    private boolean repeatDaily;
 
 }
