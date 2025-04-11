@@ -20,6 +20,8 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    EmailService emailService;
 
     public boolean registerUser(UserDTO userDTO) {
         if (userRepository.existsByUsername(userDTO.getUsername())) {
@@ -34,8 +36,10 @@ public class UserService {
         user.setEmail(userDTO.getEmail());
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         user.setCreatedAt(LocalDateTime.now());
-
         userRepository.save(user);
+
+        emailService.sendWelcomeEmail(user);
+
         return true;
     }
 

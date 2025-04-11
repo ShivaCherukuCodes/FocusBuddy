@@ -28,7 +28,7 @@ public class UserController {
 
     // Register API
     @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody UserDTO userDTO) {
+    public ResponseEntity<String> register(@Valid @RequestBody UserDTO userDTO) throws Exception {
         if (userDTO.getUsername() != null && !userDTO.getUsername().trim().isEmpty()) {
             boolean isCreated = userService.registerUser(userDTO);
             if (isCreated) {
