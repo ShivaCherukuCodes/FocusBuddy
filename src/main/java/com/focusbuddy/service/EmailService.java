@@ -51,4 +51,30 @@ public class EmailService {
         }
     }
 
+    public void sendPasswordChangeSuccessEmail(String toEmail, String username) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+        helper.setTo(toEmail);
+        helper.setSubject("🔒 Password Changed Successfully - FocusBuddy");
+
+        String htmlContent = """
+        <html>
+            <body style="font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9;">
+                <div style="max-width: 600px; margin: auto; background-color: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                    <h2 style="color: #333;">Hi <b>%s</b>,</h2>
+                    <p>Your password has been <strong>successfully changed</strong> for your FocusBuddy account.</p>
+                    <p>If you didn’t make this change, please reset your password immediately or contact support.</p>
+                    <hr style="margin: 20px 0;">
+                    <p style="font-size: 14px; color: #888;">Thank you for using FocusBuddy!</p>
+                </div>
+            </body>
+        </html>
+        """.formatted(username);
+
+        helper.setText(htmlContent, true);
+        mailSender.send(message);
+    }
+
+
 }
