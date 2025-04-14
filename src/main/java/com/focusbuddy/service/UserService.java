@@ -58,5 +58,31 @@ public class UserService {
         return userRepository.findByUsernameOrEmail(input, input).orElse(null);
     }
 
+    public Optional<User> getUserByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    public boolean changePassword(String username, String currentPassword, String newPassword) {
+        Optional<User> optionalUser = getUserByUsername(username);
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            if (passwordEncoder.matches(currentPassword, user.getPassword())) {
+                user.setPassword(passwordEncoder.encode(newPassword));
+                userRepository.save(user);
+
+                // Send success email
+                try {
+                    emailService.sendPasswordChangeSuccessEmail(user.getEmail(), user.getUsername());
+                } catch (Exception e) {
+                    e.printStackTrace(); // Or log it properly
+                }
+
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 }

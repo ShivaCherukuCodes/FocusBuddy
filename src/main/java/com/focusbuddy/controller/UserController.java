@@ -1,9 +1,7 @@
 package com.focusbuddy.controller;
 
 import com.focusbuddy.config.JwtUtil;
-import com.focusbuddy.dto.LoginDTO;
-import com.focusbuddy.dto.LoginResponseDTO;
-import com.focusbuddy.dto.UserDTO;
+import com.focusbuddy.dto.*;
 import com.focusbuddy.model.User;
 import com.focusbuddy.service.UserService;
 import jakarta.validation.Valid;
@@ -60,6 +58,45 @@ public class UserController {
         responseDTO.setEmail(user.getEmail());
 
         return ResponseEntity.ok(responseDTO);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUserProfile(@RequestHeader("Authorization") String authHeader) {
+        try {
+            String token = authHeader.replace("Bearer ", "");
+            String username = jwtUtil.extractUsername(token);
+
+            Optional<User> userOpt = userService.getUserByUsername(username);
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+
+                UserProfileDTO profileDTO = new UserProfileDTO(
+                        user.getUsername(),
+                        user.getEmail(),
+                        user.getCreatedAt().toString()
+                );
+
+                return ResponseEntity.ok(profileDTO);
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ User not found.");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Invalid or expired token.");
+        }
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordDTO dto, @RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.replace("Bearer ", "");
+        String username = jwtUtil.extractUsername(token);
+
+        boolean isChanged = userService.changePassword(username, dto.getCurrentPassword(), dto.getNewPassword());
+
+        if (isChanged) {
+            return ResponseEntity.ok("✅ Password changed successfully!");
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Current password is incorrect.");
+        }
     }
 
 
